@@ -11,5 +11,6 @@
 #include "framework.h"
 #include "SADXModLoader.h"
 #include "Trampoline.h"
+#include "lanternapi.h"
 
 #endif //PCH_H

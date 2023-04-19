@@ -2,6 +2,7 @@
 #include "Gamma.h"
 
 #define ReplacePVM(a, b) helperFunctions.ReplaceFile("system\\" a ".PVM", "system\\" b ".PVM");
+NJS_MATERIAL* TemporaryMaterialArray[] = { nullptr };
 
 DataPointer(int, EVENT_ID, 0x03B2C570);
 
@@ -18,8 +19,8 @@ void Init_Gamma()
 	E102_OBJECTS[12] = &object_00201AE4;
 	E102_OBJECTS[14] = &object_0020899C;
 	E102_OBJECTS[15] = &object_002083EC;
-	E102_OBJECTS[16] = &object_0020ABBC;
-	E102_OBJECTS[17] = &object_0020A254;
+	E102_OBJECTS[16] = &object_0020969C;
+	E102_OBJECTS[17] = &object_00208CF4;
 	E102_OBJECTS[18] = &object_00209EFC;
 	E102_OBJECTS[19] = &object_0020994C;
 	E102_OBJECTS[20] = &object_0020ABBC;
@@ -109,6 +110,75 @@ void Init_Gamma()
 	E102_ACTIONS[77]->object = &object_00207290;
 }
 
+NJS_MATERIAL* Specular3[] = {
+	&matlist_attach_001FDB40[0],
+};
+
+void ForceIgnoreSpecular_Object(NJS_OBJECT* obj, bool recursive)
+{
+	if (obj)
+	{
+		if (obj->basicdxmodel)
+		{
+			for (int k = 0; k < obj->basicdxmodel->nbMat; ++k)
+			{
+				if (!(obj->basicdxmodel->mats[k].attrflags & NJD_FLAG_IGNORE_SPECULAR)) obj->basicdxmodel->mats[k].attrflags |= NJD_FLAG_IGNORE_SPECULAR;
+			}
+		}
+		if (recursive && obj->child) ForceIgnoreSpecular_Object(obj->child, true);
+		if (recursive && obj->sibling) ForceIgnoreSpecular_Object(obj->sibling, true);
+	}
+}
+
+void ForceSpecular_Object(NJS_OBJECT* obj, bool recursive)
+{
+	if (obj)
+	{
+		if (obj->basicdxmodel)
+		{
+			for (int k = 0; k < obj->basicdxmodel->nbMat; ++k)
+			{
+				obj->basicdxmodel->mats[k].specular.color = 0xFFFFFFFF;
+				if (obj->basicdxmodel->mats[k].attrflags & NJD_FLAG_IGNORE_SPECULAR)
+				{
+					obj->basicdxmodel->mats[k].attrflags &= ~NJD_FLAG_IGNORE_SPECULAR;
+				}
+			}
+		}
+		if (recursive && obj->child) ForceSpecular_Object(obj->child, true);
+		if (recursive && obj->sibling) ForceSpecular_Object(obj->sibling, true);
+	}
+}
+
+bool ForceDiffuse2Specular2(NJS_MATERIAL* material, Uint32 flags)
+{
+	set_diffuse(2, false);
+	set_specular(2, false);
+	return true;
+}
+
+bool ForceDiffuse2Specular3(NJS_MATERIAL* material, Uint32 flags)
+{
+	set_diffuse(2, false);
+	set_specular(3, false);
+	return true;
+}
+
+void RemoveMaterialColors(NJS_OBJECT* obj)
+{
+	if (obj->basicdxmodel)
+	{
+		for (int q = 0; q < obj->basicdxmodel->nbMat; ++q)
+		{
+			obj->basicdxmodel->mats[q].diffuse.argb.r = 0xFF;
+			obj->basicdxmodel->mats[q].diffuse.argb.g = 0xFF;
+			obj->basicdxmodel->mats[q].diffuse.argb.b = 0xFF;
+		}
+	}
+	if (obj->child) RemoveMaterialColors(obj->child);
+	if (obj->sibling) RemoveMaterialColors(obj->sibling);
+}
+
 extern "C"
 {
 	__declspec(dllexport) void __cdecl Init(const char* path, const HelperFunctions& helperFunctions)
@@ -116,9 +186,14 @@ extern "C"
 		HMODULE handle = GetModuleHandle(L"CHRMODELS_orig");
 		NJS_OBJECT** ___E102_OBJECTS = (NJS_OBJECT**)GetProcAddress(handle, "___E102_OBJECTS");
 		NJS_ACTION** ___E102_ACTIONS = (NJS_ACTION**)GetProcAddress(handle, "___E102_ACTIONS");
+		HMODULE Lantern = GetModuleHandle(L"sadx-dc-lighting");
 		Init_Gamma();
 		ReplacePVM("e102", "sfe102");
 		ReplacePVM("e102_dc", "sfe102");
+		if (Lantern != nullptr)
+		{
+			material_register(Specular3, LengthOfArray(Specular3), &ForceDiffuse2Specular3);
+		}
 	}
 	__declspec(dllexport) ModInfo SADXModInfo = { ModLoaderVer };
 }
